@@ -1,0 +1,43 @@
+name: Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main   # deploy otomatis setiap push ke branch main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies & build
+        run: |
+          npm install
+          npm run build
+
+      - name: Copy files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_KEY }}
+          source: "build/*"
+          target: "/home/${{ secrets.AWS_USER }}/app"
+
+      - name: Restart app on EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.AWS_HOST }}
+          username: ${{ secrets.AWS_USER }}
+          key: ${{ secrets.AWS_KEY }}
+          script: |
+            cd ~/app
+            pm2 restart all || pm2 start npm -- start
